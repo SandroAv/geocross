@@ -1,0 +1,78 @@
+/* ===== centred dark layout ======================================= */
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: #1d2037;
+  color: #e8e8f2;
+  font-family: 'Inter', system-ui, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* ===== board ===================================================== */
+.board {
+  display: grid;
+  grid-template-columns: repeat(4, 180px);  /* 1 blank + 3 cols */
+  grid-auto-rows: 180px;
+  gap: 14px;
+}
+
+.blank { background: transparent; }
+
+.header,
+.cell {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+/* headers */
+.header {
+  background: #3c3f58;
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+/* still-empty cells */
+.cell {
+  background: #121429;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cell:hover { background: #20233d; }
+
+/* solved cells */
+.cell.done {
+  background: #0f1124;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+}
+
+/* flag span from flag-icons
+   ---------------------------------------------------------- */
+   .flag {
+    display: block;             /* let width/height apply          */
+    width: 100%;                /* fill the cell horizontally       */
+    height: 0;                  /* create height via padding hack   */
+    padding-bottom: 75%;        /* 4×3 aspect-ratio (3 / 4 = 0.75)  */
+    background-size: contain;   /* these two lines are ALSO set     */
+    background-position: 50%;   /* by flag-icons — but we repeat    */
+    border-radius: 4px;
+    box-shadow: 0 0 0 1px #0006;
+  }
+  
+  
+/* country name bar */
+.namebar {
+  align-self: stretch;
+  background: #353969;
+  border-radius: 6px;
+  padding: 4px 0;
+  font-weight: 600;
+  font-size: 16px;
+}
