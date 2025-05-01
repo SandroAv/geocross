@@ -8,7 +8,7 @@ import './index.css';
 export default function App() {
   return (
     <main className="app">
-      <h1 className="title">GeoGrid Game</h1>
+      <h1 className="title">🌎 GeoCross</h1>
       <GameBoard />
     </main>
   );
