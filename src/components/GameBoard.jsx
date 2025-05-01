@@ -4,13 +4,11 @@ import { countries }     from '../data/countries';
 import { categoryDefs }  from '../data/categories';
 import { getDailyBoard } from '../data/boardGenerator';
 import isoCountries      from 'i18n-iso-countries';
+import enLocale          from 'i18n-iso-countries/langs/en.json';
 import './board.css';
 
 /* ---------- ISO helper ------------------------------------------------ */
-isoCountries.registerLocale(
-  // ships with the package; resolves via Vite
-  await import('i18n-iso-countries/langs/en.json')
-);
+isoCountries.registerLocale(enLocale);   // ← sync, no await
 
 function isoLower(name) {
   return isoCountries.getAlpha2Code(name, 'en')?.toLowerCase() ?? null;
