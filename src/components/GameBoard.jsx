@@ -1,53 +1,53 @@
-// src/components/GameBoard.jsx
-import React, { useState, useMemo, Fragment } from 'react';   // ← React added
-import { countries }     from '../data/countries';
-import { categoryDefs }  from '../data/categories';
-import { getDailyBoard } from '../data/boardGenerator';
-import isoCountries      from 'i18n-iso-countries';
-import enLocale          from 'i18n-iso-countries/langs/en.json';
+import React, { useState, useMemo, useEffect, Fragment } from 'react';
+import { countries }      from '../data/countries';
+import { categoryDefs }   from '../data/categories';
+import { getBoard }       from '../data/boardGenerator';
+import isoCountries       from 'i18n-iso-countries';
+import enLocale           from 'i18n-iso-countries/langs/en.json';
 import './board.css';
 
-/* ---------- ISO helper ------------------------------------------------ */
-isoCountries.registerLocale(enLocale);   // ← sync, no await
+/* ---------- helpers -------------------------------------------------- */
+isoCountries.registerLocale(enLocale);
+const iso = name =>
+  isoCountries.getAlpha2Code(name, 'en')?.toLowerCase() ?? null;
+const allNames = countries.map(c => c.name).sort();
+const initGrid = (r, c) => Array(r).fill(null).map(() => Array(c).fill(null));
 
-function isoLower(name) {
-  return isoCountries.getAlpha2Code(name, 'en')?.toLowerCase() ?? null;
-}
-
-/* ---------- misc constants ------------------------------------------- */
-const allCountryNames = countries.map(c => c.name).sort();
-
-/* ---------- main component ------------------------------------------- */
+/* ---------- component ------------------------------------------------ */
 export default function GameBoard() {
-  /* deterministic rows / cols for today */
-  const today = new Date().toISOString().slice(0, 10);
-  const { rows, cols } = useMemo(() => {
-    try   { return getDailyBoard(today, 10); }
-    catch { return getDailyBoard(today, 5); }
-  }, [today]);
+  const [seed, setSeed] = useState(() => Date.now().toString());
 
-  /* state */
-  const [guesses, setGuesses] = useState(
-    Array(rows.length).fill(null).map(() => Array(cols.length).fill(null))
-  );
+  /* fresh board whenever seed changes */
+  const { rows, cols } = useMemo(() => getBoard(seed, 3), [seed]);
+
+  /* state per board */
+  const [guesses, setGuesses] = useState(() => initGrid(rows.length, cols.length));
   const [used, setUsed]       = useState(() => new Set());
-  const [editing, setEditing] = useState(null);    // {r,c} | null
+  const [editing, setEditing] = useState(null);
   const [won, setWon]         = useState(false);
 
-  /* validate & commit -------------------------------------------------- */
+  /* reset guesses when board changes */
+  useEffect(() => {
+    setGuesses(initGrid(rows.length, cols.length));
+    setUsed(new Set());
+    setWon(false);
+  }, [rows, cols]);
+
+  /* validation & commit ---------------------------------------------- */
   const validate = (r, c, raw) => {
-    const name = raw.trim();
-    const country = countries.find(
-      x => x.name.toLowerCase() === name.toLowerCase()
-    );
-    if (!country)                       return 'Not in data set';
-    if (used.has(country.name))         return 'Already used';
-    if (!categoryDefs[rows[r]].test(country) ||
-        !categoryDefs[cols[c]].test(country)) return 'Doesn’t match row & column';
+    const nm = raw.trim();
+    const ct = countries.find(x => x.name.toLowerCase() === nm.toLowerCase());
+    if (!ct) return 'Not in data set';
+    if (used.has(ct.name)) return 'Already used';
+    if (
+      !categoryDefs[rows[r]].test(ct) ||
+      !categoryDefs[cols[c]].test(ct)
+    )
+      return 'Doesn’t fit both';
     return null;
   };
 
-  const commitGuess = (r, c, name) => {
+  const commit = (r, c, name) => {
     const err = validate(r, c, name);
     if (err) return alert(err);
 
@@ -58,17 +58,26 @@ export default function GameBoard() {
     });
     setUsed(u => new Set(u).add(name));
 
-    /* win check */
-    if (guesses.flat().filter(Boolean).length === rows.length * cols.length - 1)
-      setWon(true);
+    if ([...used].length === rows.length * cols.length - 1) setWon(true);
   };
 
-  /* render ------------------------------------------------------------- */
+  /* ---------- render ------------------------------------------------- */
   return (
     <>
+      {/* NEW-GAME BUTTON */}
+      <button
+        className="new-game-btn"
+        onClick={() => setSeed(crypto.randomUUID())}
+      >
+        🔄 New Game
+      </button>
+
+      {/* GRID */}
       <div className="board">
         <div className="blank" />
-        {cols.map(k => <Header key={k} label={categoryDefs[k].label} />)}
+        {cols.map(k => (
+          <Header key={k} label={categoryDefs[k].label} />
+        ))}
 
         {rows.map((rk, r) => (
           <Fragment key={rk}>
@@ -84,22 +93,24 @@ export default function GameBoard() {
         ))}
       </div>
 
+      {/* INPUT MODAL */}
       {editing && (
         <Modal onClose={() => setEditing(null)}>
           <CountryInput
             onCancel={() => setEditing(null)}
             onSubmit={name => {
-              commitGuess(editing.r, editing.c, name);
+              commit(editing.r, editing.c, name);
               setEditing(null);
             }}
           />
         </Modal>
       )}
 
+      {/* WIN MODAL */}
       {won && (
         <Modal onClose={() => setWon(false)}>
           <h2 style={{ marginTop: 0 }}>🎉 Congratulations!</h2>
-          <p>You completed today’s grid.</p>
+          <p>You completed the grid!</p>
           <button onClick={() => setWon(false)}>Close</button>
         </Modal>
       )}
@@ -107,69 +118,83 @@ export default function GameBoard() {
   );
 }
 
-/* ---------- tiny sub-components ------------------------------------- */
-function Header({ label }) {
-  return <div className="header">{label}</div>;
-}
+/* ---------- tiny subs ----------------------------------------------- */
+const Header = ({ label }) => <div className="header">{label}</div>;
 
-function Cell({ value, onClick }) {
-  if (!value) return <div className="cell" onClick={onClick}>?</div>;
-
-  const iso = isoLower(value);
-  return (
+const Cell = ({ value, onClick }) =>
+  !value ? (
+    <div className="cell" onClick={onClick}>
+      ?
+    </div>
+  ) : (
     <div className="cell done" onClick={onClick}>
-      {iso
-        ? <span className={`fi fi-${iso} flag`} />
-        : <div className="flag" />}    {/* fallback square if ISO lookup fails */}
+      {iso(value) ? (
+        <span className={`fi fi-${iso(value)} flag`} />
+      ) : (
+        <div className="flag" />
+      )}
       <div className="namebar">{value}</div>
     </div>
   );
-}
 
-function Modal({ children, onClose }) {
-  return (
+const Modal = ({ children, onClose }) => (
+  <div
+    style={{
+      position: 'fixed',
+      inset: 0,
+      zIndex: 999,
+      background: 'rgba(0,0,0,.15)',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+    }}
+    onClick={onClose}
+  >
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 999,
-        background: 'rgba(0,0,0,0.45)',
-        display: 'flex', justifyContent: 'center', alignItems: 'center',
+        background: '#22253d',
+        borderRadius: 12,
+        padding: 24,
+        minWidth: 280,
       }}
-      onClick={onClose}
+      onClick={e => e.stopPropagation()}
     >
-      <div
-        style={{ background: '#22253d', borderRadius: 12, padding: 24, minWidth: 280 }}
-        onClick={e => e.stopPropagation()}
-      >
-        {children}
-      </div>
+      {children}
     </div>
-  );
-}
+  </div>
+);
 
 function CountryInput({ onCancel, onSubmit }) {
-  const [text, setText] = useState('');
+  const [txt, setTxt] = useState('');       /* ← stray C removed */
 
   return (
     <form
       onSubmit={e => {
         e.preventDefault();
-        onSubmit(text);
+        onSubmit(txt);
       }}
     >
-      <label style={{ display: 'block', marginBottom: 8 }}>Enter country:</label>
+      <label style={{ display: 'block', marginBottom: 8 }}>
+        Enter country:
+      </label>
       <input
         list="countries"
-        value={text}
-        onChange={e => setText(e.target.value)}
+        value={txt}
+        onChange={e => setTxt(e.target.value)}
         style={{
-          width: '100%', padding: '8px 10px',
-          borderRadius: 6, border: '1px solid #555',
-          background: '#2d304b', color: '#fff', fontSize: 16,
+          width: '100%',
+          padding: '8px 10px',               /* 10px, not 1C0px */
+          borderRadius: 6,
+          border: '1px solid #555',
+          background: '#2d304b',
+          color: '#fff',
         }}
         autoFocus
       />
       <datalist id="countries">
-        {allCountryNames.map(n => <option value={n} key={n} />)}
+        {allNames.map(name => (
+          <option value={name} key={name} />
+        ))}
       </datalist>
 
       <div style={{ marginTop: 16, textAlign: 'right' }}>
